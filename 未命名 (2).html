@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>俄语单词记忆助手</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center p-4">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">俄语单词记忆助手</h1>
+    
+    <div class="w-full max-w-2xl bg-white rounded-lg shadow-md p-6 mb-6">
+        <div class="flex justify-between mb-4">
+            <button id="add-btn" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition">添加单词</button>
+            <button id="study-btn" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition">开始学习</button>
+        </div>
+        
+        <!-- 添加单词表单 -->
+        <div id="add-form" class="mb-6 hidden">
+            <div class="flex gap-2 mb-2">
+                <input type="text" id="russian-word" placeholder="俄语单词" class="flex-1 px-3 py-2 border border-gray-300 rounded">
+                <input type="text" id="chinese-meaning" placeholder="中文意思" class="flex-1 px-3 py-2 border border-gray-300 rounded">
+            </div>
+            <button id="save-word" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition">保存</button>
+        </div>
+        
+        <!-- 学习模式选择 -->
+        <div id="study-mode" class="mb-6 hidden">
+            <h3 class="text-xl font-semibold mb-3">选择学习模式</h3>
+            <div class="flex gap-4">
+                <button id="ru-to-cn" class="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 transition">俄译汉</button>
+                <button id="cn-to-ru" class="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 transition">汉译俄</button>
+            </div>
+            <div class="mt-4">
+                <h3 class="text-xl font-semibold mb-2">选择学习分组</h3>
+                <div id="group-list" class="flex flex-wrap gap-2">
+                    <button data-group="all" class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition">全部单词</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 单词学习卡片 -->
+        <div id="study-card" class="mb-6 hidden">
+            <div class="text-2xl font-bold mb-4 text-center" id="current-word"></div>
+            <div class="text-xl text-center mb-4 hidden" id="word-meaning"></div>
+            <button id="show-answer" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition mx-auto block mb-4">显示答案</button>
+            <div class="flex gap-2 justify-center">
+                <button id="know-btn" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition">记得</button>
+                <button id="partial-btn" class="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition">模糊</button>
+                <button id="dont-know-btn" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition">不记得</button>
+            </div>
+        </div>
+        
+        <!-- 学习进度 -->
+        <div id="progress" class="mb-6 hidden">
+            <div class="text-center mb-2">进度: <span id="current-progress">0/0</span></div>
+            <div class="w-full bg-gray-200 rounded-full h-2.5">
+                <div id="progress-bar" class="bg-green-500 h-2.5 rounded-full" style="width: 0%"></div>
+            </div>
+        </div>
+        
+        <!-- 单词列表（按分组展示） -->
+        <div id="word-list-container">
+            <h3 class="text-xl font-semibold mb-2">单词分组列表</h3>
+            <!-- 记得分组 -->
+            <div class="mb-4">
+                <h4 class="text-lg font-medium text-green-600">记得的单词</h4>
+                <div id="know-list" class="max-h-32 overflow-y-auto p-2 bg-green-50 rounded"></div>
+            </div>
+            <!-- 模糊分组 -->
+            <div class="mb-4">
+                <h4 class="text-lg font-medium text-yellow-600">模糊的单词</h4>
+                <div id="partial-list" class="max-h-32 overflow-y-auto p-2 bg-yellow-50 rounded"></div>
+            </div>
+            <!-- 不记得分组 -->
+            <div class="mb-4">
+                <h4 class="text-lg font-medium text-red-600">不记得的单词</h4>
+                <div id="dont-know-list" class="max-h-32 overflow-y-auto p-2 bg-red-50 rounded"></div>
+            </div>
+            <!-- 新单词分组 -->
+            <div>
+                <h4 class="text-lg font-medium text-gray-600">新添加的单词</h4>
+                <div id="new-list" class="max-h-32 overflow-y-auto p-2 bg-gray-50 rounded"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 单词数据结构（默认status为new）
+        let words = JSON.parse(localStorage.getItem('russianWords')) || [];
+        let currentStudyWords = [];
+        let currentIndex = 0;
+        let studyMode = 'ru-to-cn';
+        let currentGroup = 'all';
+        
+        // DOM元素
+        const addBtn = document.getElementById('add-btn');
+        const studyBtn = document.getElementById('study-btn');
+        const addForm = document.getElementById('add-form');
+        const studyModeEl = document.getElementById('study-mode');
+        const studyCard = document.getElementById('study-card');
+        const saveWordBtn = document.getElementById('save-word');
+        const russianWordInput = document.getElementById('russian-word');
+        const chineseMeaningInput = document.getElementById('chinese-meaning');
+        const currentWordEl = document.getElementById('current-word');
+        const wordMeaningEl = document.getElementById('word-meaning');
+        const showAnswerBtn = document.getElementById('show-answer');
+        const knowBtn = document.getElementById('know-btn');
+        const partialBtn = document.getElementById('partial-btn');
+        const dontKnowBtn = document.getElementById('dont-know-btn');
+        const ruToCnBtn = document.getElementById('ru-to-cn');
+        const cnToRuBtn = document.getElementById('cn-to-ru');
+        const groupList = document.getElementById('group-list');
+        const progressEl = document.getElementById('progress');
+        const currentProgressEl = document.getElementById('current-progress');
+        const progressBar = document.getElementById('progress-bar');
+        // 分组列表容器
+        const knowListEl = document.getElementById('know-list');
+        const partialListEl = document.getElementById('partial-list');
+        const dontKnowListEl = document.getElementById('dont-know-list');
+        const newListEl = document.getElementById('new-list');
+        const wordListContainer = document.getElementById('word-list-container');
+        
+        // 初始化
+        function init() {
+            renderGroupedWordLists();
+            renderGroupList();
+            bindEvents();
+        }
+        
+        // 绑定事件
+        function bindEvents() {
+            addBtn.addEventListener('click', toggleAddForm);
+            studyBtn.addEventListener('click', toggleStudyMode);
+            saveWordBtn.addEventListener('click', saveWord);
+            showAnswerBtn.addEventListener('click', showAnswer);
+            knowBtn.addEventListener('click', () => handleAnswer('know'));
+            partialBtn.addEventListener('click', () => handleAnswer('partial'));
+            dontKnowBtn.addEventListener('click', () => handleAnswer('dontKnow'));
+            ruToCnBtn.addEventListener('click', () => startStudy('ru-to-cn'));
+            cnToRuBtn.addEventListener('click', () => startStudy('cn-to-ru'));
+            
+            // 分组选择事件委托
+            groupList.addEventListener('click', (e) => {
+                if (e.target.tagName === 'BUTTON') {
+                    document.querySelectorAll('#group-list button').forEach(btn => {
+                        btn.classList.remove('bg-blue-500', 'text-white');
+                        btn.classList.add('bg-gray-200');
+                    });
+                    e.target.classList.remove('bg-gray-200');
+                    e.target.classList.add('bg-blue-500', 'text-white');
+                    currentGroup = e.target.dataset.group;
+                }
+            });
+            
+            // 删除按钮事件委托
+            document.querySelectorAll('#know-list, #partial-list, #dont-know-list, #new-list').forEach(list => {
+                list.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('delete-btn')) {
+                        const wordId = parseInt(e.target.dataset.id);
+                        deleteWord(wordId);
+                    }
+                });
+            });
+        }
+        
+        // 切换添加表单显示
+        function toggleAddForm() {
+            addForm.classList.toggle('hidden');
+            studyModeEl.classList.add('hidden');
+            studyCard.classList.add('hidden');
+            progressEl.classList.add('hidden');
+            wordListContainer.classList.remove('hidden'); // 显示单词列表
+        }
+        
+        // 切换学习模式选择
+        function toggleStudyMode() {
+            studyModeEl.classList.toggle('hidden');
+            addForm.classList.add('hidden');
+            studyCard.classList.add('hidden');
+            progressEl.classList.add('hidden');
+            wordListContainer.classList.remove('hidden'); // 显示单词列表
+            // 重新渲染分组列表（确保数量准确）
+            renderGroupList();
+        }
+        
+        // 保存单词（默认状态为new）
+        function saveWord() {
+            const russian = russianWordInput.value.trim();
+            const chinese = chineseMeaningInput.value.trim();
+            
+            if (russian && chinese) {
+                words.push({
+                    russian,
+                    chinese,
+                    status: 'new', // new/know/partial/dontKnow
+                    id: Date.now()
+                });
+                
+                saveToLocalStorage();
+                renderGroupedWordLists();
+                renderGroupList();
+                
+                // 清空输入框
+                russianWordInput.value = '';
+                chineseMeaningInput.value = '';
+                
+                // 提示添加成功
+                alert('单词添加成功！');
+            } else {
+                alert('请输入完整的俄语单词和中文意思！');
+            }
+        }
+        
+        // 删除单词
+        function deleteWord(wordId) {
+            words = words.filter(word => word.id !== wordId);
+            saveToLocalStorage();
+            renderGroupedWordLists();
+            renderGroupList();
+        }
+        
+        // 重置学习卡片状态
+        function resetStudyCard() {
+            // 显示所有按钮和元素
+            showAnswerBtn.classList.remove('hidden');
+            knowBtn.classList.remove('hidden');
+            partialBtn.classList.remove('hidden');
+            dontKnowBtn.classList.remove('hidden');
+            wordMeaningEl.classList.add('hidden');
+            currentWordEl.textContent = '';
+            wordMeaningEl.textContent = '';
+        }
+        
+        // 开始学习（按选择的分组筛选单词）
+        function startStudy(mode) {
+            studyMode = mode;
+            studyModeEl.classList.add('hidden');
+            studyCard.classList.remove('hidden');
+            progressEl.classList.remove('hidden');
+            wordListContainer.classList.add('hidden'); // 隐藏单词列表
+            
+            // 重置学习卡片状态
+            resetStudyCard();
+            
+            // 根据选择的分组筛选单词
+            switch(currentGroup) {
+                case 'all':
+                    currentStudyWords = [...words];
+                    break;
+                case 'new':
+                    currentStudyWords = words.filter(word => word.status === 'new');
+                    break;
+                case 'know':
+                    currentStudyWords = words.filter(word => word.status === 'know');
+                    break;
+                case 'partial':
+                    currentStudyWords = words.filter(word => word.status === 'partial');
+                    break;
+                case 'dontKnow':
+                    currentStudyWords = words.filter(word => word.status === 'dontKnow');
+                    break;
+            }
+            
+            // 打乱单词顺序
+            currentStudyWords = shuffleArray(currentStudyWords);
+            currentIndex = 0;
+            
+            if (currentStudyWords.length > 0) {
+                showCurrentWord();
+                updateProgress();
+            } else {
+                currentWordEl.textContent = '该分组暂无单词！';
+                showAnswerBtn.classList.add('hidden');
+                knowBtn.classList.add('hidden');
+                partialBtn.classList.add('hidden');
+                dontKnowBtn.classList.add('hidden');
+                wordListContainer.classList.remove('hidden'); // 显示单词列表
+            }
+        }
+        
+        // 显示当前单词（仅显示需记忆的内容，隐藏答案）
+        function showCurrentWord() {
+            const word = currentStudyWords[currentIndex];
+            wordMeaningEl.classList.add('hidden'); // 默认隐藏答案
+            showAnswerBtn.classList.remove('hidden'); // 显示"显示答案"按钮
+            
+            if (studyMode === 'ru-to-cn') {
+                // 俄译汉：只显示俄语单词，隐藏中文意思
+                currentWordEl.textContent = word.russian;
+                wordMeaningEl.textContent = `中文意思：${word.chinese}`;
+            } else {
+                // 汉译俄：只显示中文意思，隐藏俄语单词
+                currentWordEl.textContent = word.chinese;
+                wordMeaningEl.textContent = `俄语单词：${word.russian}`;
+            }
+        }
+        
+        // 显示答案
+        function showAnswer() {
+            wordMeaningEl.classList.remove('hidden');
+            showAnswerBtn.classList.add('hidden');
+        }
+        
+        // 处理用户回答（更新单词分组）
+        function handleAnswer(status) {
+            // 更新当前单词的状态
+            const currentWord = currentStudyWords[currentIndex];
+            const wordIndex = words.findIndex(word => word.id === currentWord.id);
+            
+            if (wordIndex !== -1) {
+                words[wordIndex].status = status; // 按选择归类到对应分组
+                saveToLocalStorage();
+            }
+            
+            // 跳转到下一个单词
+            currentIndex++;
+            
+            if (currentIndex < currentStudyWords.length) {
+                showCurrentWord();
+                updateProgress();
+            } else {
+                currentWordEl.textContent = '学习完成！';
+                wordMeaningEl.textContent = '恭喜你完成了本轮学习，单词已自动分组！';
+                wordMeaningEl.classList.remove('hidden');
+                showAnswerBtn.classList.add('hidden');
+                knowBtn.classList.add('hidden');
+                partialBtn.classList.add('hidden');
+                dontKnowBtn.classList.add('hidden');
+                // 刷新分组列表并显示
+                renderGroupedWordLists();
+                renderGroupList();
+                wordListContainer.classList.remove('hidden'); // 显示单词列表
+            }
+        }
+        
+        // 更新学习进度
+        function updateProgress() {
+            const progress = ((currentIndex + 1) / currentStudyWords.length) * 100;
+            progressBar.style.width = `${progress}%`;
+            currentProgressEl.textContent = `${currentIndex + 1}/${currentStudyWords.length}`;
+        }
+        
+        // 渲染分组单词列表（按记得/模糊/不记得/新单词分类显示）
+        function renderGroupedWordLists() {
+            // 筛选各分组单词
+            const knowWords = words.filter(word => word.status === 'know');
+            const partialWords = words.filter(word => word.status === 'partial');
+            const dontKnowWords = words.filter(word => word.status === 'dontKnow');
+            const newWords = words.filter(word => word.status === 'new');
+            
+            // 渲染记得的单词
+            knowListEl.innerHTML = knowWords.length > 0 
+                ? knowWords.map(word => `
+                    <div class="flex justify-between items-center p-1 border-b border-green-100">
+                        <span>${word.russian} - ${word.chinese}</span>
+                        <button class="delete-btn text-red-500 text-sm" data-id="${word.id}">删除</button>
+                    </div>
+                `).join('')
+                : '<p class="text-gray-500 text-sm">暂无单词</p>';
+            
+            // 渲染模糊的单词
+            partialListEl.innerHTML = partialWords.length > 0 
+                ? partialWords.map(word => `
+                    <div class="flex justify-between items-center p-1 border-b border-yellow-100">
+                        <span>${word.russian} - ${word.chinese}</span>
+                        <button class="delete-btn text-red-500 text-sm" data-id="${word.id}">删除</button>
+                    </div>
+                `).join('')
+                : '<p class="text-gray-500 text-sm">暂无单词</p>';
+            
+            // 渲染不记得的单词
+            dontKnowListEl.innerHTML = dontKnowWords.length > 0 
+                ? dontKnowWords.map(word => `
+                    <div class="flex justify-between items-center p-1 border-b border-red-100">
+                        <span>${word.russian} - ${word.chinese}</span>
+                        <button class="delete-btn text-red-500 text-sm" data-id="${word.id}">删除</button>
+                    </div>
+                `).join('')
+                : '<p class="text-gray-500 text-sm">暂无单词</p>';
+            
+            // 渲染新单词
+            newListEl.innerHTML = newWords.length > 0 
+                ? newWords.map(word => `
+                    <div class="flex justify-between items-center p-1 border-b border-gray-100">
+                        <span>${word.russian} - ${word.chinese}</span>
+                        <button class="delete-btn text-red-500 text-sm" data-id="${word.id}">删除</button>
+                    </div>
+                `).join('')
+                : '<p class="text-gray-500 text-sm">暂无单词</p>';
+        }
+        
+        // 渲染分组选择列表
+        function renderGroupList() {
+            // 清除现有分组（保留全部单词）
+            const allBtn = groupList.querySelector('[data-group="all"]');
+            groupList.innerHTML = '';
+            groupList.appendChild(allBtn);
+            
+            // 添加其他分组
+            const groups = ['new', 'know', 'partial', 'dontKnow'];
+            const groupNames = {
+                'new': '新单词',
+                'know': '记得',
+                'partial': '模糊',
+                'dontKnow': '不记得'
+            };
+            
+            groups.forEach(group => {
+                const count = words.filter(word => word.status === group).length;
+                if (count > 0) {
+                    const groupBtn = document.createElement('button');
+                    groupBtn.className = 'px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 transition';
+                    groupBtn.dataset.group = group;
+                    groupBtn.textContent = `${groupNames[group]}(${count})`;
+                    groupList.appendChild(groupBtn);
+                }
+            });
+        }
+        
+        // 保存到本地存储
+        function saveToLocalStorage() {
+            localStorage.setItem('russianWords', JSON.stringify(words));
+        }
+        
+        // 数组打乱
+        function shuffleArray(array) {
+            const newArray = [...array];
+            for (let i = newArray.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+            }
+            return newArray;
+        }
+        
+        // 启动应用
+        init();
+    </script>
+</body>
+</html>
